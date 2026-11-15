@@ -216,9 +216,13 @@ void SystemSensors::sampleGpu(QVariantMap &out) {
             NvmlMemory mem{0, 0, 0};
             if (fnGetMem_(nvmlDevice_, &mem) == 0 && mem.total > 0) {
                 const double pct = (100.0 * mem.used) / double(mem.total);
+                const double usedGb = mem.used / (1024.0 * 1024.0 * 1024.0);
+                const double totalGb = mem.total / (1024.0 * 1024.0 * 1024.0);
                 out.insert(QStringLiteral("gpu.mem_pct"), pct);
-                out.insert(QStringLiteral("gpu.mem_used_gb"), mem.used / (1024.0 * 1024.0 * 1024.0));
-                out.insert(QStringLiteral("gpu.mem_total_gb"), mem.total / (1024.0 * 1024.0 * 1024.0));
+                out.insert(QStringLiteral("gpu.mem_used_gb"), usedGb);
+                out.insert(QStringLiteral("gpu.mem_total_gb"), totalGb);
+                out.insert(QStringLiteral("gpu.mem_detail"),
+                           QStringLiteral("%1/%2G").arg(usedGb, 0, 'f', 1).arg(totalGb, 0, 'f', 0));
             }
         }
 
@@ -244,6 +248,19 @@ void SystemSensors::sampleGpu(QVariantMap &out) {
             if (ok) {
                 out.insert(QStringLiteral("gpu.util"), busy);
                 out.insert(QStringLiteral("gpu.detail"), QStringLiteral("%1%").arg(qRound(busy)));
+
+                bool okUsed = false, okTotal = false;
+                const quint64 vramUsed = readFirstLine(drmDir.filePath(card + QStringLiteral("/device/mem_info_vram_used"))).toULongLong(&okUsed);
+                const quint64 vramTotal = readFirstLine(drmDir.filePath(card + QStringLiteral("/device/mem_info_vram_total"))).toULongLong(&okTotal);
+                if (okUsed && okTotal && vramTotal > 0) {
+                    const double usedGb = vramUsed / (1024.0 * 1024.0 * 1024.0);
+                    const double totalGb = vramTotal / (1024.0 * 1024.0 * 1024.0);
+                    out.insert(QStringLiteral("gpu.mem_pct"), (100.0 * vramUsed) / double(vramTotal));
+                    out.insert(QStringLiteral("gpu.mem_used_gb"), usedGb);
+                    out.insert(QStringLiteral("gpu.mem_total_gb"), totalGb);
+                    out.insert(QStringLiteral("gpu.mem_detail"),
+                               QStringLiteral("%1/%2G").arg(usedGb, 0, 'f', 1).arg(totalGb, 0, 'f', 0));
+                }
                 return;
             }
         }
@@ -251,6 +268,8 @@ void SystemSensors::sampleGpu(QVariantMap &out) {
 
     out.insert(QStringLiteral("gpu.util"), 0.0);
     out.insert(QStringLiteral("gpu.detail"), QStringLiteral("N/A"));
+    out.insert(QStringLiteral("gpu.mem_pct"), 0.0);
+    out.insert(QStringLiteral("gpu.mem_detail"), QStringLiteral("N/A"));
 }
 
 void SystemSensors::sampleNetwork(QVariantMap &out, double dtSec) {
