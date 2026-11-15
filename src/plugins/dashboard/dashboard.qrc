@@ -1,0 +1,33 @@
+<RCC>
+    <qresource prefix="/dashboard">
+        <file alias="icon.png">assets/icon.png</file>
+        <file alias="menu_icon.png">assets/menu_icon.png</file>
+        <file alias="default_dashboard.json">configs/default_dashboard.json</file>
+        <file alias="frames/card.9.png">assets/frames/card.9.png</file>
+        <file alias="frames/panel.9.png">assets/frames/panel.9.png</file>
+        <file alias="frames/accent.9.png">assets/frames/accent.9.png</file>
+        <file alias="frames/compact.9.png">assets/frames/compact.9.png</file>
+        <file alias="icons/clock.svg">assets/icons/clock.svg</file>
+        <file alias="icons/cpu.svg">assets/icons/cpu.svg</file>
+        <file alias="icons/memory.svg">assets/icons/memory.svg</file>
+        <file alias="icons/swap.svg">assets/icons/swap.svg</file>
+        <file alias="icons/gpu.svg">assets/icons/gpu.svg</file>
+        <file alias="icons/lan.svg">assets/icons/lan.svg</file>
+        <file alias="icons/wlan.svg">assets/icons/wlan.svg</file>
+        <file alias="icons/home.svg">assets/icons/home.svg</file>
+        <file alias="icons/door.svg">assets/icons/door.svg</file>
+        <file alias="icons/light.svg">assets/icons/light.svg</file>
+        <file alias="icons/shield.svg">assets/icons/shield.svg</file>
+        <file alias="icons/alert.svg">assets/icons/alert.svg</file>
+        <file alias="icons/weather.svg">assets/icons/weather.svg</file>
+        <file alias="icons/weather_sunny.svg">assets/icons/weather_sunny.svg</file>
+        <file alias="icons/weather_night.svg">assets/icons/weather_night.svg</file>
+        <file alias="icons/weather_partlycloudy.svg">assets/icons/weather_partlycloudy.svg</file>
+        <file alias="icons/weather_cloudy.svg">assets/icons/weather_cloudy.svg</file>
+        <file alias="icons/weather_rainy.svg">assets/icons/weather_rainy.svg</file>
+        <file alias="icons/weather_snowy.svg">assets/icons/weather_snowy.svg</file>
+        <file alias="icons/weather_lightning.svg">assets/icons/weather_lightning.svg</file>
+        <file alias="icons/weather_fog.svg">assets/icons/weather_fog.svg</file>
+        <file alias="icons/weather_windy.svg">assets/icons/weather_windy.svg</file>
+    </qresource>
+</RCC>

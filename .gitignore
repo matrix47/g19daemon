@@ -30,3 +30,4 @@ _CPack_Packages/
 cmake-build-debug/*
 
 *.autosave
+src/plugins/dashboard/configs/dashboard_matrix.json

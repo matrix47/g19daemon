@@ -1,0 +1,9 @@
+#include "@DASH_ENTRY_HEADER@"
+
+@DASH_CLASS_NAME@::@DASH_CLASS_NAME@()
+    : dashboard::DashboardPluginBase(
+          QStringLiteral("@DASH_PLUGIN_ID@"),
+          QStringLiteral("@DASH_PLUGIN_NAME@"),
+          QStringLiteral(":/@DASH_TARGET@_config/layout.json")) {
+    Q_INIT_RESOURCE(@DASH_TARGET@_config);
+}

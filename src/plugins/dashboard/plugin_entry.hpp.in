@@ -1,0 +1,12 @@
+#pragma once
+
+#include "@DASH_BASE_INCLUDE@"
+
+class @DASH_CLASS_NAME@ : public dashboard::DashboardPluginBase {
+    Q_OBJECT
+    Q_INTERFACES(PluginInterface)
+    Q_PLUGIN_METADATA(IID "@DASH_PLUGIN_ID@")
+
+public:
+    @DASH_CLASS_NAME@();
+};
