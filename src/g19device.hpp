@@ -25,7 +25,9 @@
 #include <QtConcurrent/QtConcurrent>
 #include <QtCore/QObject>
 #include <QtGui/QImage>
+#include <atomic>
 #include <libusb.h>
+#include <mutex>
 
 using namespace std;
 
@@ -122,21 +124,28 @@ public:
 
     void lKeyCallback(unsigned int keys);
 
+    void resubmitGKeysTransfer();
+
+    void resubmitLKeysTransfer();
+
     G19Keys getActiveMKey();
 
     unsigned int getKeys();
 
-    bool gKeysTransferCancelled;
-    bool lKeysTransferCancelled;
+    std::atomic<bool> gKeysTransferCancelled;
+    std::atomic<bool> lKeysTransferCancelled;
 
     G19DeviceType type{};
 
 private:
     unsigned int lastkeys;
-    bool isDeviceConnected;
-    bool isInitialized;
-    bool enableEventThread;
-    bool isTransfering;
+    std::atomic<bool> isDeviceConnected;
+    std::atomic<bool> isInitialized;
+    std::atomic<bool> enableEventThread;
+    std::atomic<bool> isTransfering;
+    std::atomic<bool> isClosing;
+    bool hasHotplugCallback;
+    std::mutex keysTransferMutex;
     QString cstatus;
     G19Keys activeMKey;
 
@@ -153,6 +162,11 @@ private:
     libusb_hotplug_callback_handle hotplugCallback{};
 
     bool probeDevices();
+
+    void cancelAndFreeTransfer(libusb_transfer *&transfer,
+                               std::atomic<bool> &cancelledFlag);
+
+    void submitDataTransfer();
 
     QFuture<void> future;
 
