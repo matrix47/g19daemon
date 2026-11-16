@@ -4,6 +4,7 @@
 #include <QDebug>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QPainter>
 
 static void initDashboardResources() {
@@ -37,12 +38,21 @@ DashboardPluginBase::DashboardPluginBase(const QString &pluginId,
     connect(timer_, &QTimer::timeout, this, &DashboardPluginBase::onTimer);
 
     watcher_ = new QFileSystemWatcher(this);
-    connect(watcher_, &QFileSystemWatcher::fileChanged, this, &DashboardPluginBase::reloadConfig);
+    connect(watcher_, &QFileSystemWatcher::fileChanged, this, &DashboardPluginBase::scheduleReload);
+    connect(watcher_, &QFileSystemWatcher::directoryChanged, this, &DashboardPluginBase::scheduleReload);
 
-    loadConfig();
+    reloadDebounce_ = new QTimer(this);
+    reloadDebounce_->setSingleShot(true);
+    reloadDebounce_->setInterval(100);
+    connect(reloadDebounce_, &QTimer::timeout, this, &DashboardPluginBase::reloadConfig);
+
+    loadConfig(true);
 }
 
 DashboardPluginBase::~DashboardPluginBase() {
+    if (reloadDebounce_) {
+        reloadDebounce_->stop();
+    }
     if (timer_) {
         timer_->stop();
     }
@@ -50,21 +60,40 @@ DashboardPluginBase::~DashboardPluginBase() {
     delete screen_;
 }
 
-void DashboardPluginBase::loadConfig() {
+void DashboardPluginBase::armWatchers() {
+    const QString cfgDir = QFileInfo(overrideConfigPath_).absolutePath();
+    if (QDir(cfgDir).exists() && !watcher_->directories().contains(cfgDir)) {
+        watcher_->addPath(cfgDir);
+    }
+    if (QFile::exists(overrideConfigPath_) && !watcher_->files().contains(overrideConfigPath_)) {
+        watcher_->addPath(overrideConfigPath_);
+    }
+}
+
+void DashboardPluginBase::scheduleReload() {
+    if (reloadDebounce_) {
+        reloadDebounce_->start();
+    }
+}
+
+void DashboardPluginBase::loadConfig(bool isInitial) {
+    armWatchers();
+
     QString loadPath = embeddedConfigPath_;
     if (QFile::exists(overrideConfigPath_)) {
         loadPath = overrideConfigPath_;
-        if (!watcher_->files().contains(overrideConfigPath_)) {
-            watcher_->addPath(overrideConfigPath_);
-        }
     }
 
     DashboardConfig cfg;
     QString err;
     if (!DashboardConfig::loadFromFile(loadPath, cfg, &err)) {
         qWarning() << "Dashboard config load failed:" << err;
-        if (loadPath != embeddedConfigPath_) {
-            DashboardConfig::loadFromFile(embeddedConfigPath_, cfg, &err);
+        if (isInitial && loadPath != embeddedConfigPath_) {
+            if (!DashboardConfig::loadFromFile(embeddedConfigPath_, cfg, &err)) {
+                return;
+            }
+        } else {
+            return;
         }
     }
 
@@ -78,7 +107,7 @@ void DashboardPluginBase::loadConfig() {
 }
 
 void DashboardPluginBase::reloadConfig() {
-    loadConfig();
+    loadConfig(false);
     if (isActive_) {
         paint();
     }

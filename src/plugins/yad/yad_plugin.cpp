@@ -8,6 +8,7 @@
 #include <QDir>
 #include <QFile>
 #include <QPainter>
+#include <algorithm>
 
 static void initYadResources() {
     Q_INIT_RESOURCE(yad);
@@ -21,23 +22,50 @@ YadPlugin::YadPlugin(QObject *parent) : QObject(parent) {
     engine_ = std::make_unique<yad::YadEngine>(*platform_, 320, 240, yad::PixelFormat::RGB32);
 
     watcher_ = new QFileSystemWatcher(this);
-    connect(watcher_, &QFileSystemWatcher::fileChanged, this, &YadPlugin::reloadConfig);
+    connect(watcher_, &QFileSystemWatcher::fileChanged, this, &YadPlugin::scheduleReload);
+    connect(watcher_, &QFileSystemWatcher::directoryChanged, this, &YadPlugin::scheduleReload);
 
-    timer_ = new QTimer(this);
-    timer_->setInterval(50);
-    connect(timer_, &QTimer::timeout, this, &YadPlugin::onTick);
+    reloadDebounce_ = new QTimer(this);
+    reloadDebounce_->setSingleShot(true);
+    reloadDebounce_->setInterval(100);
+    connect(reloadDebounce_, &QTimer::timeout, this, &YadPlugin::reloadConfig);
 
-    loadConfig();
+    netTimer_ = new QTimer(this);
+    netTimer_->setInterval(50);
+    connect(netTimer_, &QTimer::timeout, this, &YadPlugin::onNetPoll);
+
+    renderTimer_ = new QTimer(this);
+    renderTimer_->setTimerType(Qt::PreciseTimer);
+    renderTimer_->setInterval(1000);
+    connect(renderTimer_, &QTimer::timeout, this, &YadPlugin::onRenderTick);
+
+    loadConfig(true);
 }
 
 YadPlugin::~YadPlugin() {
-    if (timer_) timer_->stop();
+    if (reloadDebounce_) reloadDebounce_->stop();
+    if (netTimer_) netTimer_->stop();
+    if (renderTimer_) renderTimer_->stop();
     engine_.reset();
     platform_.reset();
     delete screen_;
 }
 
-void YadPlugin::loadConfig() {
+void YadPlugin::armWatchers(const QString &cfgDir) {
+    if (QDir(cfgDir).exists() && !watcher_->directories().contains(cfgDir)) {
+        watcher_->addPath(cfgDir);
+    }
+    if (!activeConfigPath_.isEmpty() && QFile::exists(activeConfigPath_) &&
+        !watcher_->files().contains(activeConfigPath_)) {
+        watcher_->addPath(activeConfigPath_);
+    }
+}
+
+void YadPlugin::scheduleReload() {
+    if (reloadDebounce_) reloadDebounce_->start();
+}
+
+void YadPlugin::loadConfig(bool isInitial) {
     const QString cfgDir = QDir::homePath() + QStringLiteral("/.config/G19Daemon");
     const QString yadCfg = cfgDir + QStringLiteral("/yad.json");
     const QString dashCfg = cfgDir + QStringLiteral("/dashboard.json");
@@ -51,23 +79,25 @@ void YadPlugin::loadConfig() {
     else chosen = defaultCfg;
 
     activeConfigPath_ = chosen;
-    if (QFile::exists(activeConfigPath_) && !watcher_->files().contains(activeConfigPath_)) {
-        watcher_->addPath(activeConfigPath_);
-    }
+    armWatchers(cfgDir);
 
     std::string err;
     if (!engine_->loadConfigFromFile(activeConfigPath_.toStdString(), &err)) {
         qWarning() << "YadPlugin config load failed:" << QString::fromStdString(err);
-        if (activeConfigPath_ != defaultCfg && QFile::exists(defaultCfg)) {
+        if (isInitial && activeConfigPath_ != defaultCfg && QFile::exists(defaultCfg)) {
             engine_->loadConfigFromFile(defaultCfg.toStdString(), &err);
+        } else {
+            return;
         }
     }
+
+    renderTimer_->setInterval(std::max(100, engine_->config().refreshMs));
 }
 
 void YadPlugin::reloadConfig() {
-    loadConfig();
+    loadConfig(false);
     if (isActive_) {
-        engine_->renderNow();
+        engine_->sampleAndRender();
         pushFrame();
     }
 }
@@ -91,11 +121,14 @@ QObject *YadPlugin::getQObject() {
 void YadPlugin::setActive(bool active) {
     isActive_ = active;
     if (active) {
-        engine_->tick(true);
+        engine_->pollNetwork();
+        engine_->sampleAndRender();
         pushFrame();
-        timer_->start();
+        netTimer_->start();
+        renderTimer_->start();
     } else {
-        timer_->stop();
+        netTimer_->stop();
+        renderTimer_->stop();
     }
 }
 
@@ -110,18 +143,22 @@ void YadPlugin::lKeys(int keys) {
         engine_->renderNow();
         pushFrame();
     } else if (keys & G19_KEY_LOK) {
-        engine_->renderNow();
+        engine_->sampleAndRender();
         pushFrame();
     }
 }
 
 void YadPlugin::mKeys(int) {}
 
-void YadPlugin::onTick() {
+void YadPlugin::onNetPoll() {
     if (!isActive_) return;
-    if (engine_->tick(false)) {
-        pushFrame();
-    }
+    engine_->pollNetwork();
+}
+
+void YadPlugin::onRenderTick() {
+    if (!isActive_) return;
+    engine_->sampleAndRender();
+    pushFrame();
 }
 
 void YadPlugin::pushFrame() {

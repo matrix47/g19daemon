@@ -39,10 +39,12 @@ signals:
 
 private slots:
     void onTimer();
+    void scheduleReload();
     void reloadConfig();
 
 private:
-    void loadConfig();
+    void loadConfig(bool isInitial);
+    void armWatchers();
     void paint();
 
     QString pluginId_;
@@ -56,6 +58,7 @@ private:
     HaClient *haClient_ = nullptr;
     DashboardConfig config_;
     QTimer *timer_ = nullptr;
+    QTimer *reloadDebounce_ = nullptr;
     QFileSystemWatcher *watcher_ = nullptr;
     bool isActive_ = false;
 };

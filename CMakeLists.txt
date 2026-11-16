@@ -4,7 +4,9 @@ project(g19daemon)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_INSTALL_PREFIX /usr)
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    set(CMAKE_INSTALL_PREFIX /usr CACHE PATH "Install prefix" FORCE)
+endif()
 
 include(FetchContent)
 

@@ -36,15 +36,20 @@ signals:
     void doAction(gAction action, void *data);
 
 private slots:
-    void onTick();
+    void onNetPoll();
+    void onRenderTick();
+    void scheduleReload();
     void reloadConfig();
 
 private:
-    void loadConfig();
+    void loadConfig(bool isInitial);
+    void armWatchers(const QString &cfgDir);
     void pushFrame();
 
     Gscreen *screen_ = nullptr;
-    QTimer *timer_ = nullptr;
+    QTimer *netTimer_ = nullptr;
+    QTimer *renderTimer_ = nullptr;
+    QTimer *reloadDebounce_ = nullptr;
     QFileSystemWatcher *watcher_ = nullptr;
     QString activeConfigPath_;
     bool isActive_ = false;
