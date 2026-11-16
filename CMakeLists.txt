@@ -78,4 +78,5 @@ add_subdirectory(src/plugins/mpris)
 add_subdirectory(src/plugins/clock)
 add_subdirectory(src/plugins/hardwaremonitor)
 add_subdirectory(src/plugins/dashboard)
+add_subdirectory(src/plugins/yad)
 

@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/yad">
+        <file>icon.png</file>
+        <file>menu_icon.png</file>
+    </qresource>
+</RCC>
