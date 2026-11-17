@@ -8,9 +8,11 @@
 #include <QObject>
 #include <QString>
 #include <QTimer>
+#include <cstdint>
 #include <memory>
 
 namespace yad {
+class Framebuffer;
 class PosixPlatform;
 class YadEngine;
 }  // namespace yad
@@ -36,22 +38,21 @@ signals:
     void doAction(gAction action, void *data);
 
 private slots:
-    void onNetPoll();
-    void onRenderTick();
+    void onStep();
     void scheduleReload();
     void reloadConfig();
 
 private:
     void loadConfig(bool isInitial);
     void armWatchers(const QString &cfgDir);
-    void pushFrame();
+    void pushFrame(const yad::Framebuffer &fb);
 
     Gscreen *screen_ = nullptr;
-    QTimer *netTimer_ = nullptr;
-    QTimer *renderTimer_ = nullptr;
+    QTimer *stepTimer_ = nullptr;
     QTimer *reloadDebounce_ = nullptr;
     QFileSystemWatcher *watcher_ = nullptr;
     QString activeConfigPath_;
+    uint64_t nextRenderMs_ = 0;
     bool isActive_ = false;
 
     std::unique_ptr<yad::PosixPlatform> platform_;

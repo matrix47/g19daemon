@@ -30,22 +30,17 @@ YadPlugin::YadPlugin(QObject *parent) : QObject(parent) {
     reloadDebounce_->setInterval(100);
     connect(reloadDebounce_, &QTimer::timeout, this, &YadPlugin::reloadConfig);
 
-    netTimer_ = new QTimer(this);
-    netTimer_->setInterval(50);
-    connect(netTimer_, &QTimer::timeout, this, &YadPlugin::onNetPoll);
-
-    renderTimer_ = new QTimer(this);
-    renderTimer_->setTimerType(Qt::PreciseTimer);
-    renderTimer_->setInterval(1000);
-    connect(renderTimer_, &QTimer::timeout, this, &YadPlugin::onRenderTick);
+    stepTimer_ = new QTimer(this);
+    stepTimer_->setTimerType(Qt::PreciseTimer);
+    stepTimer_->setInterval(50);
+    connect(stepTimer_, &QTimer::timeout, this, &YadPlugin::onStep);
 
     loadConfig(true);
 }
 
 YadPlugin::~YadPlugin() {
     if (reloadDebounce_) reloadDebounce_->stop();
-    if (netTimer_) netTimer_->stop();
-    if (renderTimer_) renderTimer_->stop();
+    if (stepTimer_) stepTimer_->stop();
     engine_.reset();
     platform_.reset();
     delete screen_;
@@ -90,15 +85,16 @@ void YadPlugin::loadConfig(bool isInitial) {
             return;
         }
     }
-
-    renderTimer_->setInterval(std::max(100, engine_->config().refreshMs));
 }
 
 void YadPlugin::reloadConfig() {
     loadConfig(false);
     if (isActive_) {
-        engine_->sampleAndRender();
-        pushFrame();
+        const uint64_t now = platform_->nowMs();
+        const uint64_t interval = static_cast<uint64_t>(engine_->getIntervalMs());
+        nextRenderMs_ = now + interval;
+        pushFrame(engine_->getFrame(true));
+        engine_->step();
     }
 }
 
@@ -121,14 +117,14 @@ QObject *YadPlugin::getQObject() {
 void YadPlugin::setActive(bool active) {
     isActive_ = active;
     if (active) {
-        engine_->pollNetwork();
-        engine_->sampleAndRender();
-        pushFrame();
-        netTimer_->start();
-        renderTimer_->start();
+        const uint64_t now = platform_->nowMs();
+        const uint64_t interval = static_cast<uint64_t>(engine_->getIntervalMs());
+        nextRenderMs_ = now + interval;
+        pushFrame(engine_->getFrame(true));
+        engine_->step();
+        stepTimer_->start();
     } else {
-        netTimer_->stop();
-        renderTimer_->stop();
+        stepTimer_->stop();
     }
 }
 
@@ -136,37 +132,44 @@ void YadPlugin::lKeys(int keys) {
     if (!isActive_) return;
     if (keys & G19_KEY_LRIGHT) {
         engine_->nextPage();
-        engine_->renderNow();
-        pushFrame();
+        nextRenderMs_ = platform_->nowMs() + static_cast<uint64_t>(engine_->getIntervalMs());
+        pushFrame(engine_->getFrame(false));
+        engine_->step();
     } else if (keys & G19_KEY_LLEFT) {
         engine_->prevPage();
-        engine_->renderNow();
-        pushFrame();
+        nextRenderMs_ = platform_->nowMs() + static_cast<uint64_t>(engine_->getIntervalMs());
+        pushFrame(engine_->getFrame(false));
+        engine_->step();
     } else if (keys & G19_KEY_LOK) {
-        engine_->sampleAndRender();
-        pushFrame();
+        nextRenderMs_ = platform_->nowMs() + static_cast<uint64_t>(engine_->getIntervalMs());
+        pushFrame(engine_->getFrame(true));
+        engine_->step();
     }
 }
 
 void YadPlugin::mKeys(int) {}
 
-void YadPlugin::onNetPoll() {
+void YadPlugin::onStep() {
     if (!isActive_) return;
-    engine_->pollNetwork();
+    engine_->step();
+
+    const uint64_t now = platform_->nowMs();
+    const uint64_t interval = static_cast<uint64_t>(engine_->getIntervalMs());
+    if (now >= nextRenderMs_) {
+        pushFrame(engine_->getFrame(true));
+        nextRenderMs_ += interval;
+        if (now >= nextRenderMs_ + interval) {
+            nextRenderMs_ = now + interval;
+        }
+    }
 }
 
-void YadPlugin::onRenderTick() {
+void YadPlugin::pushFrame(const yad::Framebuffer &fb) {
     if (!isActive_) return;
-    engine_->sampleAndRender();
-    pushFrame();
-}
-
-void YadPlugin::pushFrame() {
-    if (!isActive_) return;
-    const QImage frame(reinterpret_cast<const uchar *>(engine_->pixels32()),
-                       engine_->width(),
-                       engine_->height(),
-                       engine_->width() * static_cast<int>(sizeof(uint32_t)),
+    const QImage frame(reinterpret_cast<const uchar *>(fb.data32()),
+                       fb.width(),
+                       fb.height(),
+                       fb.strideBytes(),
                        QImage::Format_RGB32);
     QPainter *p = screen_->beginFullScreen();
     p->drawImage(0, 0, frame);
