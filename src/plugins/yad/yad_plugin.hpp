@@ -52,7 +52,7 @@ private:
     QTimer *reloadDebounce_ = nullptr;
     QFileSystemWatcher *watcher_ = nullptr;
     QString activeConfigPath_;
-    uint64_t nextRenderMs_ = 0;
+    uint64_t nextRenderWallMs_ = 0;
     bool isActive_ = false;
 
     std::unique_ptr<yad::PosixPlatform> platform_;

@@ -90,10 +90,10 @@ void YadPlugin::loadConfig(bool isInitial) {
 void YadPlugin::reloadConfig() {
     loadConfig(false);
     if (isActive_) {
-        const uint64_t now = platform_->nowMs();
+        const uint64_t nowWall = platform_->nowWallMs();
         const uint64_t interval = static_cast<uint64_t>(engine_->getIntervalMs());
-        nextRenderMs_ = now + interval;
-        pushFrame(engine_->getFrame(true));
+        nextRenderWallMs_ = yad::YadEngine::nextAlignedWallMs(nowWall, interval);
+        pushFrame(engine_->getFrame(true, static_cast<std::time_t>(nowWall / 1000ULL)));
         engine_->step();
     }
 }
@@ -117,10 +117,10 @@ QObject *YadPlugin::getQObject() {
 void YadPlugin::setActive(bool active) {
     isActive_ = active;
     if (active) {
-        const uint64_t now = platform_->nowMs();
+        const uint64_t nowWall = platform_->nowWallMs();
         const uint64_t interval = static_cast<uint64_t>(engine_->getIntervalMs());
-        nextRenderMs_ = now + interval;
-        pushFrame(engine_->getFrame(true));
+        nextRenderWallMs_ = yad::YadEngine::nextAlignedWallMs(nowWall, interval);
+        pushFrame(engine_->getFrame(true, static_cast<std::time_t>(nowWall / 1000ULL)));
         engine_->step();
         stepTimer_->start();
     } else {
@@ -132,17 +132,23 @@ void YadPlugin::lKeys(int keys) {
     if (!isActive_) return;
     if (keys & G19_KEY_LRIGHT) {
         engine_->nextPage();
-        nextRenderMs_ = platform_->nowMs() + static_cast<uint64_t>(engine_->getIntervalMs());
-        pushFrame(engine_->getFrame(false));
+        const uint64_t nowWall = platform_->nowWallMs();
+        const uint64_t interval = static_cast<uint64_t>(engine_->getIntervalMs());
+        nextRenderWallMs_ = yad::YadEngine::nextAlignedWallMs(nowWall, interval);
+        pushFrame(engine_->getFrame(false, static_cast<std::time_t>(nowWall / 1000ULL)));
         engine_->step();
     } else if (keys & G19_KEY_LLEFT) {
         engine_->prevPage();
-        nextRenderMs_ = platform_->nowMs() + static_cast<uint64_t>(engine_->getIntervalMs());
-        pushFrame(engine_->getFrame(false));
+        const uint64_t nowWall = platform_->nowWallMs();
+        const uint64_t interval = static_cast<uint64_t>(engine_->getIntervalMs());
+        nextRenderWallMs_ = yad::YadEngine::nextAlignedWallMs(nowWall, interval);
+        pushFrame(engine_->getFrame(false, static_cast<std::time_t>(nowWall / 1000ULL)));
         engine_->step();
     } else if (keys & G19_KEY_LOK) {
-        nextRenderMs_ = platform_->nowMs() + static_cast<uint64_t>(engine_->getIntervalMs());
-        pushFrame(engine_->getFrame(true));
+        const uint64_t nowWall = platform_->nowWallMs();
+        const uint64_t interval = static_cast<uint64_t>(engine_->getIntervalMs());
+        nextRenderWallMs_ = yad::YadEngine::nextAlignedWallMs(nowWall, interval);
+        pushFrame(engine_->getFrame(true, static_cast<std::time_t>(nowWall / 1000ULL)));
         engine_->step();
     }
 }
@@ -153,14 +159,15 @@ void YadPlugin::onStep() {
     if (!isActive_) return;
     engine_->step();
 
-    const uint64_t now = platform_->nowMs();
+    const uint64_t nowWall = platform_->nowWallMs();
     const uint64_t interval = static_cast<uint64_t>(engine_->getIntervalMs());
-    if (now >= nextRenderMs_) {
-        pushFrame(engine_->getFrame(true));
-        nextRenderMs_ += interval;
-        if (now >= nextRenderMs_ + interval) {
-            nextRenderMs_ = now + interval;
-        }
+    if (nextRenderWallMs_ > nowWall + interval + 1000ULL) {
+        nextRenderWallMs_ = yad::YadEngine::nextAlignedWallMs(nowWall, interval);
+    }
+    if (nowWall >= nextRenderWallMs_) {
+        const std::time_t wallSec = static_cast<std::time_t>(nowWall / 1000ULL);
+        pushFrame(engine_->getFrame(true, wallSec));
+        nextRenderWallMs_ = yad::YadEngine::advanceAlignedWallMs(nextRenderWallMs_, nowWall, interval);
     }
 }
 
